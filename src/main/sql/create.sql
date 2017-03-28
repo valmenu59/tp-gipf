@@ -1,15 +1,12 @@
-drop table Arbitre;
-drop table Partie;
-drop table Tournoi;
+DROP TABLE Arbitre, Partie, Tournoi, Joueur;
 
-drop table Joueur;
+-- Modèle relationnel (Question 1)
 
 CREATE TABLE Joueur (
   login text PRIMARY KEY,
   elo integer NOT NULL DEFAULT 1000,
   password text NOT NULL,
-  email text NOT NULL UNIQUE CHECK (email ~ '@')
-);
+  email text NOT NULL UNIQUE CHECK (email ~ '@'));
 
 CREATE TABLE Tournoi (
   idTournoi serial primary key,
@@ -29,8 +26,7 @@ CREATE TABLE Partie (
   idTournoi int references Tournoi,
   check (blanc != noir),
   check (gagnant = noir or perdant = noir),
-  check (gagnant = blanc or perdant = blanc)
-  );
+  check (gagnant = blanc or perdant = blanc));
 
 CREATE TABLE Arbitre (
   login text references Joueur,

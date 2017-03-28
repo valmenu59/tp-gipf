@@ -30,7 +30,7 @@ public class Main {
 			}
 
 			// Inscription de quelques joueurs avec mot de passe aléatoire
-			// Question 4
+			// (Question 2)
 			List<Joueur> joueurs = new ArrayList<>();
 			for (String username : Arrays.asList("baroqueen", "cobrag", "vikingkong", "preaster", "fickleSkeleton",
 					"SnowTea", "AfternoonTerror", "JokeCherry", "JealousPelican", "PositiveLamb")) {
@@ -38,9 +38,8 @@ public class Main {
 						con));
 			}
 
+			// Enregistrement de quelques parties (Question 3)
 			List<Partie> parties = new ArrayList<>();
-			// Enregistrement de quelques parties
-			// Question oubliée
 			for (int i = 0; i < 50; i++) {
 				int j1 = RAND.nextInt(joueurs.size());
 				int j2 = RAND.nextInt(joueurs.size());
@@ -50,31 +49,25 @@ public class Main {
 			}
 
 			// Sélection des victoires aléatoire pour les 30 premières parties
+			// La mise à jour des scores ELO des joueurs est automatique
 			for (Partie p : parties.subList(0, 30)) {
 				p.setGagnant(RAND.nextBoolean(), RAND.nextInt(5), con);
 			}
 
 			// Affichages
-			System.out.println("*** Classement ELO (Question 1) ***");
+			System.out.println("*** Classement ELO (Question 4) ***");
 			for (Joueur j : Joueur.loadByElo(con)) {
 				System.out.println(j);
 			}
 			System.out.println();
 
-			System.out.println("*** Classement parties gagnées (Question 3) ***");
+			System.out.println("*** Classement parties gagnées (Question 5) ***");
 			for (Entry<Joueur, Integer> j : Joueur.loadByPartiesGagnees(con).entrySet()) {
 				System.out.println(j);
 			}
 			System.out.println();
 
-			System.out.println("*** Classement parties jouées (Question 2) ***");
-			for (Entry<Joueur, Integer> j : Joueur.loadByPartiesJouees(con).entrySet()) {
-				System.out.println(j);
-			}
-			System.out.println();
-
-			// Enregistrement d'un tournoi
-			// Question 5
+			// Enregistrement d'un tournoi (Question 6)
 			// Sélection aléatoire de trois arbitres dans la liste des joueurs
 			Collections.shuffle(joueurs, RAND);
 			List<Joueur> arbitres = joueurs.subList(0, 3);
@@ -82,12 +75,17 @@ public class Main {
 			Tournoi t = Tournoi.create(LocalDate.of(2017, 3, 10), LocalDate.of(2017, 3, 12), "Maubeuge", arbitres, con);
 			System.out.println(t);
 
-			// Affectation des 10 premières parties au tournoi
-			// Question 6
+			// Affectation des 10 premières parties au tournoi (Question 7)
 			for (Partie p : parties.subList(0, 10)) {
 				p.setTournoi(t);
 				p.save(con);
 			}
+
+			System.out.println("*** Classement parties jouées (Question 8) ***");
+			for (Entry<Joueur, Integer> j : Joueur.loadByPartiesJouees(con).entrySet()) {
+				System.out.println(j);
+			}
+			System.out.println();
 
 		}
 	}
