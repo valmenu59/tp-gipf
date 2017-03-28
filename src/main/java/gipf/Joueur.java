@@ -51,8 +51,9 @@ public class Joueur {
 		try (Statement stmt = con.createStatement()) {
 			ResultSet rs = stmt.executeQuery("INSERT INTO Joueur VALUES ('" + login + "', DEFAULT, '" + password
 					+ "', '" + email + "') RETURNING *");
-
-			rs.next();
+			if (!rs.next()) {
+				throw new IllegalStateException("Aucune donnée insérée à l'inscription de " + login);
+			}
 			int elo = rs.getInt("elo");
 			return new Joueur(login, email, password, elo);
 
@@ -62,7 +63,7 @@ public class Joueur {
 	public static Joueur load(String login, Connection con) throws SQLException {
 		try (Statement stmt = con.createStatement()) {
 			ResultSet rs = stmt.executeQuery("SELECT * FROM Joueur WHERE login = '" + login + "'");
-			if (rs.next() == false) {
+			if (!rs.next()) {
 				throw new IllegalArgumentException("L'utilisateur " + login + " n'existe pas");
 			}
 			int elo = rs.getInt("elo");
@@ -74,14 +75,14 @@ public class Joueur {
 
 	public static Map<Joueur, Integer> loadByPartiesJouees(Connection con) throws SQLException {
 		try (Statement stmt = con.createStatement()) {
-			ResultSet rs = stmt.executeQuery("WITH Played AS (                "
-					+ "  SELECT idPartie, blanc AS login FROM Partie          "
-					+ "  UNION                                                "
-					+ "  SELECT idPartie, noir AS login FROM Partie)          "
-					+ "SELECT Joueur.*, count(idPartie)                       "
-					+ "FROM Joueur LEFT JOIN Played USING (login)             "
-					+ "GROUP BY login                                         "
-					+ "ORDER BY count(idPartie) DESC                          ");
+			ResultSet rs = stmt.executeQuery(
+					"WITH Played AS (                " + "  SELECT idPartie, blanc AS login FROM Partie          "
+							+ "  UNION                                                "
+							+ "  SELECT idPartie, noir AS login FROM Partie)          "
+							+ "SELECT Joueur.*, count(idPartie)                       "
+							+ "FROM Joueur LEFT JOIN Played USING (login)             "
+							+ "GROUP BY login                                         "
+							+ "ORDER BY count(idPartie) DESC                          ");
 
 			Map<Joueur, Integer> data = new LinkedHashMap<>();
 			while (rs.next()) {

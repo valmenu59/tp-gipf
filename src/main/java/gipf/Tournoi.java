@@ -31,7 +31,10 @@ public class Tournoi {
 		try (Statement stmt = con.createStatement()) {
 			ResultSet rs = stmt.executeQuery(
 					"INSERT INTO Tournoi VALUES (DEFAULT, '" + debut + "', '" + fin + "', '" + lieu + "') RETURNING *");
-			rs.next();
+			if (!rs.next()) {
+				throw new IllegalStateException(
+						"Aucune donnée insérée à la création du tournoi de " + lieu + " du " + debut);
+			}
 			int id = rs.getInt("idTournoi");
 			for (Joueur j : arbitres) {
 				stmt.executeUpdate("INSERT INTO Arbitre VALUES ('" + j.getLogin() + "', " + id + ")");

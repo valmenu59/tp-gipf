@@ -42,7 +42,9 @@ public class Partie {
 		try (Statement stmt = con.createStatement()) {
 			ResultSet rs = stmt.executeQuery("INSERT INTO Partie VALUES (DEFAULT, DEFAULT, NULL, '" + blanc.getLogin()
 					+ "', '" + noir.getLogin() + "', NULL, NULL, NULL) RETURNING *");
-			rs.next();
+			if (!rs.next()) {
+				throw new IllegalStateException("Aucune donnée insérée à l'enregistrement de la partie");
+			}
 			int id = rs.getInt("idPartie");
 			Instant date = rs.getTimestamp("datePartie").toInstant();
 			return new Partie(id, date, blanc, noir);
