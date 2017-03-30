@@ -1,13 +1,13 @@
 package gipf;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.Optional;
 
 public class Joueur {
 	private final String login;
@@ -35,6 +35,14 @@ public class Joueur {
 		return login;
 	}
 
+	public void setPassword(String s) {
+		password = s;
+	}
+
+	public void setEmail(String s) {
+		email = s;
+	}
+
 	@Override
 	public String toString() {
 		return "Joueur [login=" + login + ", elo=" + elo + "]";
@@ -47,71 +55,44 @@ public class Joueur {
 		}
 	}
 
-	public static Joueur inscrire(String login, String password, String email, Connection con) throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			ResultSet rs = stmt.executeQuery("INSERT INTO Joueur VALUES ('" + login + "', DEFAULT, '" + password
-					+ "', '" + email + "') RETURNING *");
+	public static Joueur inscrire(String login, String password, String email, Connection con)
+			throws SQLException, InscriptionException {
+		try (PreparedStatement stmt = con
+				.prepareStatement("INSERT INTO Joueur VALUES (?, DEFAULT, ?, ?) RETURNING *")) {
+			stmt.setString(1, login);
+			stmt.setString(2, password);
+			stmt.setString(3, email);
+			ResultSet rs = stmt.executeQuery();
 			if (!rs.next()) {
 				throw new IllegalStateException("Aucune donnée insérée à l'inscription de " + login);
 			}
 			int elo = rs.getInt("elo");
 			return new Joueur(login, email, password, elo);
 
+		} catch (SQLException e) {
+			switch (e.getSQLState()) {
+			case "23505":
+				throw new InscriptionException("Le login " + login + " ou l'email " + email + " existe déjà");
+			case "23514":
+				throw new InscriptionException("Erreur de contrôle des données : " + e.getLocalizedMessage());
+			default:
+				System.out.println(e.getSQLState());
+				throw e;
+			}
 		}
 	}
 
-	public static Joueur load(String login, Connection con) throws SQLException {
+	public static Optional<Joueur> load(String login, Connection con) throws SQLException {
 		try (Statement stmt = con.createStatement()) {
 			ResultSet rs = stmt.executeQuery("SELECT * FROM Joueur WHERE login = '" + login + "'");
 			if (!rs.next()) {
-				throw new IllegalArgumentException("L'utilisateur " + login + " n'existe pas");
-			}
-			int elo = rs.getInt("elo");
-			String email = rs.getString("email");
-			String pwd = rs.getString("password");
-			return new Joueur(login, email, pwd, elo);
-		}
-	}
-
-	public static Map<Joueur, Integer> loadByPartiesJouees(Connection con) throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			ResultSet rs = stmt.executeQuery(
-					"WITH Played AS (                " + "  SELECT idPartie, blanc AS login FROM Partie          "
-							+ "  UNION                                                "
-							+ "  SELECT idPartie, noir AS login FROM Partie)          "
-							+ "SELECT Joueur.*, count(idPartie)                       "
-							+ "FROM Joueur LEFT JOIN Played USING (login)             "
-							+ "GROUP BY login                                         "
-							+ "ORDER BY count(idPartie) DESC                          ");
-
-			Map<Joueur, Integer> data = new LinkedHashMap<>();
-			while (rs.next()) {
+				return Optional.empty();
+			} else {
 				int elo = rs.getInt("elo");
 				String email = rs.getString("email");
 				String pwd = rs.getString("password");
-				String login = rs.getString("login");
-				int count = rs.getInt("count");
-				data.put(new Joueur(login, email, pwd, elo), count);
+				return Optional.of(new Joueur(login, email, pwd, elo));
 			}
-			return data;
-		}
-	}
-
-	public static Map<Joueur, Integer> loadByPartiesGagnees(Connection con) throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			ResultSet rs = stmt
-					.executeQuery("SELECT Joueur.*, count(idPartie) FROM Joueur LEFT JOIN Partie ON login = gagnant "
-							+ "GROUP BY login ORDER BY count(idPartie) DESC");
-			Map<Joueur, Integer> data = new LinkedHashMap<>();
-			while (rs.next()) {
-				int elo = rs.getInt("elo");
-				String email = rs.getString("email");
-				String pwd = rs.getString("password");
-				String login = rs.getString("login");
-				int count = rs.getInt("count");
-				data.put(new Joueur(login, email, pwd, elo), count);
-			}
-			return data;
 		}
 	}
 
@@ -127,6 +108,22 @@ public class Joueur {
 				data.add(new Joueur(login, email, pwd, elo));
 			}
 			return data;
+		}
+	}
+
+	public String getEmail() {
+		return email;
+	}
+
+	public String getPassword() {
+		return password;
+	}
+
+	public boolean equals(Object o) {
+		if (o instanceof Joueur) {
+			return login.equals(((Joueur) o).login);
+		} else {
+			return false;
 		}
 	}
 
