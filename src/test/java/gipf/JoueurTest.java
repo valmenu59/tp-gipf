@@ -4,6 +4,7 @@ import static org.junit.Assert.assertThat;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Arrays;
@@ -60,9 +61,8 @@ public class JoueurTest {
 	public void testInscrire() {
 		for (int i = 0; i < usernames.size(); i++) {
 			assertEquals(usernames.get(i), joueurs.get(i).getLogin());
-			assertEquals(1000, joueurs.get(i).getElo());
+			assertEquals(1000, joueurs.get(i).getElo(), 0);
 			assertEquals(usernames.get(i) + "@univ-valenciennes.fr", joueurs.get(i).getEmail());
-			assertEquals(36, joueurs.get(i).getPassword().length());
 		}
 	}
 
@@ -89,9 +89,8 @@ public class JoueurTest {
 			assertThat(gj, isPresent());
 			Joueur j = gj.get();
 			assertEquals(u, j.getLogin());
-			assertEquals(1000, j.getElo());
+			assertEquals(1000, j.getElo(), 0);
 			assertEquals(u + "@univ-valenciennes.fr", j.getEmail());
-			assertEquals(36, j.getPassword().length());
 		}
 		assertThat(Joueur.load("toto", con), isEmpty());
 	}
@@ -100,9 +99,9 @@ public class JoueurTest {
 	public void testElo() throws SQLException {
 		Joueur j = joueurs.get(0);
 		j.addElo(1000);
-		assertEquals(2000, j.getElo());
+		assertEquals(2000, j.getElo(), 0);
 		j.addElo(-20);
-		assertEquals(1980, j.getElo());
+		assertEquals(1980, j.getElo(), 0);
 	}
 
 	@Test
@@ -114,8 +113,8 @@ public class JoueurTest {
 		j.save(con);
 
 		Joueur loaded = Joueur.load(usernames.get(0), con).get();
-		assertEquals("newPass", loaded.getPassword());
-		assertEquals(2000, loaded.getElo());
+		assertTrue(loaded.checkPassword("newPass"));
+		assertEquals(2000, loaded.getElo(), 0);
 		assertEquals("a@b.com", loaded.getEmail());
 	}
 
@@ -125,13 +124,13 @@ public class JoueurTest {
 		List<Partie> parties = PartieTest.randParties(joueurs, rand, con);
 		PartieTest.randGagnants(parties, rand, con);
 
-		Map<String, Integer> refElo = joueurs.stream().collect(Collectors.toMap(Joueur::getLogin, Joueur::getElo));
+		Map<String, Double> refElo = joueurs.stream().collect(Collectors.toMap(Joueur::getLogin, Joueur::getElo));
 
 		List<Joueur> classement = Joueur.loadByElo(con);
 		assertThat(classement, containsInAnyOrder(joueurs.toArray()));
 
 		for (Joueur j : classement) {
-			assertEquals(refElo.get(j.getLogin()).intValue(), j.getElo());
+			assertEquals(refElo.get(j.getLogin()), j.getElo(), 0.5);
 		}
 
 		for (int i = 0; i < classement.size() - 1; i++) {

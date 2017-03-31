@@ -1,10 +1,10 @@
-DROP TABLE Arbitre, Partie, Tournoi, Joueur;
+DROP TABLE IF EXISTS Arbitre, Partie, Tournoi, Joueur;
 
 -- Modèle relationnel (Question 1)
 
 CREATE TABLE Joueur (
   login text PRIMARY KEY,
-  elo integer NOT NULL DEFAULT 1000,
+  elo real NOT NULL DEFAULT 1000,
   password text NOT NULL,
   email text NOT NULL UNIQUE CHECK (email ~ '@'));
 

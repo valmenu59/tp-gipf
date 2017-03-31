@@ -73,6 +73,12 @@ public class TournoiTest {
 		assertEquals(tournoi.getFin(), Tournoi.load(tournoi.getIdTournoi(), con).get().getFin());
 	}
 
+	@Test(expected = Exception.class)
+	public void testSetFinIncorrecte() throws SQLException {
+		tournoi.setFin(LocalDate.of(2016, 3, 11));
+		tournoi.save(con);
+	}
+
 	@Test
 	public void testAddArbitre() throws SQLException, InscriptionException {
 		Joueur a = Joueur.inscrire("toto", "toto", "t@b.c", con);

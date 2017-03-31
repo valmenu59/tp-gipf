@@ -12,6 +12,7 @@ import static org.junit.Assert.assertThat;
 
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -54,7 +55,9 @@ public class PartieTest {
 	public static void randGagnants(List<Partie> parties, Random rand, Connection con) throws SQLException {
 		// Sélection des victoires aléatoire pour les 30 premières parties
 		for (Partie p : parties.subList(0, 30)) {
-			p.setGagnant(rand.nextBoolean(), rand.nextInt(5), con);
+			if (!p.getPiecesRestantes().isPresent()) {
+				p.setGagnant(rand.nextBoolean(), rand.nextInt(5), con);
+			}
 		}
 	}
 
@@ -86,6 +89,22 @@ public class PartieTest {
 	}
 
 	@Test
+	public void testSave() throws SQLException {
+		Partie p = parties.get(0);
+		p.setDate(LocalDateTime.of(2001, 7, 3, 11, 32));
+		p.save(con);
+		
+		Partie l = Partie.load(p.getIdPartie(), con).get();
+		assertEquals(p.getDate(), l.getDate());
+	}
+
+	@Test(expected = Exception.class)
+	public void testSetGagnantDouble() throws SQLException {
+		Partie p = parties.get(0);
+		p.setGagnant(true, 4, con);
+	}
+
+	@Test
 	public void testSetGagnant() throws SQLException {
 
 		Partie p = parties.get(1);
@@ -97,7 +116,7 @@ public class PartieTest {
 		assertThat(p.getPerdant(), isEmpty());
 		assertThat(p.getPiecesRestantes(), isEmpty());
 
-		assertEquals(1000, blanc.getElo());
+		assertEquals(1000, blanc.getElo(), 0);
 
 		p.setGagnant(true, 5, con);
 
@@ -105,24 +124,29 @@ public class PartieTest {
 		assertThat(p.getPerdant(), hasValue(noir));
 		assertThat(p.getPiecesRestantes(), hasValue(5));
 
-		assertEquals(1016, blanc.getElo());
-		assertEquals(984, noir.getElo());
+		assertEquals(1016, blanc.getElo(), .5);
+		assertEquals(984, noir.getElo(), .5);
 
 		randGagnants(parties, new Random(0), con);
+
 		Map<String, Integer> testValues = new HashMap<>();
-		testValues.put("baroqueen", 1080);
-		testValues.put("cobrag", 1032);
-		testValues.put("vikingkong", 952);
-		testValues.put("preaster", 1048);
-		testValues.put("fickleSkeleton", 984);
-		testValues.put("SnowTea", 968);
-		testValues.put("AfternoonTerror", 984);
-		testValues.put("JokeCherry", 968);
-		testValues.put("JealousPelican", 952);
-		testValues.put("PositiveLamb", 1032);
+		testValues.put("baroqueen", 969);
+		testValues.put("cobrag", 967);
+		testValues.put("vikingkong", 955);
+		testValues.put("preaster", 1043);
+		testValues.put("fickleSkeleton", 1015);
+		testValues.put("SnowTea", 1060);
+		testValues.put("AfternoonTerror", 1044);
+		testValues.put("JokeCherry", 914);
+		testValues.put("JealousPelican", 1018);
+		testValues.put("PositiveLamb", 1014);
+
+		// for (Joueur j : joueurs) {
+		// System.out.println(j.toString()));
+		// }
 
 		for (Joueur j : joueurs) {
-			assertEquals(testValues.get(j.getLogin()).intValue(), j.getElo());
+			assertEquals(testValues.get(j.getLogin()), j.getElo(), .5);
 		}
 
 	}
@@ -155,18 +179,19 @@ public class PartieTest {
 	public void testPartiesGagnees() throws SQLException {
 		randGagnants(parties, new Random(0), con);
 		Map<String, Integer> testValues = new HashMap<>();
-		testValues.put("baroqueen", 5);
-		testValues.put("cobrag", 3);
-		testValues.put("vikingkong", 1);
+		testValues.put("baroqueen", 4);
+		testValues.put("cobrag", 2);
+		testValues.put("vikingkong", 2);
 		testValues.put("preaster", 5);
 		testValues.put("fickleSkeleton", 2);
-		testValues.put("SnowTea", 3);
-		testValues.put("AfternoonTerror", 1);
-		testValues.put("JokeCherry", 4);
-		testValues.put("JealousPelican", 4);
+		testValues.put("SnowTea", 5);
+		testValues.put("AfternoonTerror", 0);
+		testValues.put("JokeCherry", 5);
+		testValues.put("JealousPelican", 3);
 		testValues.put("PositiveLamb", 2);
 
 		Map<Joueur, Integer> classement = Partie.classementPartiesGagnees(con);
+
 		assertThat(classement.keySet(), containsInAnyOrder(joueurs.toArray()));
 		int prev = Integer.MAX_VALUE;
 		for (Entry<Joueur, Integer> j : classement.entrySet()) {

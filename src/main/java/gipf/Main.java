@@ -7,6 +7,10 @@ import java.sql.Statement;
 import org.postgresql.ds.PGSimpleDataSource;
 import org.postgresql.ds.common.BaseDataSource;
 
+/**
+ * Une classe permettant d'initialiser la connection à la base de données et
+ * faire quelques tests si nécessaire
+ */
 public class Main {
 	private static final BaseDataSource DS;
 
@@ -20,7 +24,14 @@ public class Main {
 	}
 
 	/**
-	 * Suppression de toutes les données
+	 * Construction désactivée
+	 */
+	private Main() {
+		throw new IllegalStateException();
+	}
+
+	/**
+	 * Supprime toutes les données de la base
 	 * 
 	 * @param con
 	 * @throws SQLException
@@ -31,6 +42,10 @@ public class Main {
 		}
 	}
 
+	/**
+	 * @return une connection à la base de données
+	 * @throws SQLException
+	 */
 	public static Connection connect() throws SQLException {
 		return DS.getConnection();
 	}
