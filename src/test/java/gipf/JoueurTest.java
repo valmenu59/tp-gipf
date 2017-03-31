@@ -52,8 +52,8 @@ public class JoueurTest {
 	}
 
 	@Test
-	public void testEquals() {
-		Joueur j1 = new Joueur("baroqueen", "", "", 0);
+	public void testEquals() throws SQLException {
+		Joueur j1 = Joueur.load("baroqueen", con).get();
 		assertEquals(j1, joueurs.get(0));
 	}
 

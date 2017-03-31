@@ -2,27 +2,12 @@ package gipf;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.sql.Statement;
-
-import org.postgresql.ds.PGSimpleDataSource;
-import org.postgresql.ds.common.BaseDataSource;
 
 /**
  * Une classe permettant d'initialiser la connection à la base de données et
  * faire quelques tests si nécessaire
  */
 public class Main {
-	private static final BaseDataSource DS;
-
-	static {
-		/** Configurer la source de données */
-		DS = new PGSimpleDataSource();
-		DS.setServerName("localhost");
-		DS.setDatabaseName("gipf");
-		DS.setUser("vion");
-		DS.setPassword("vion");
-	}
-
 	/**
 	 * Construction désactivée
 	 */
@@ -37,9 +22,7 @@ public class Main {
 	 * @throws SQLException
 	 */
 	public static void clean(Connection con) throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			stmt.executeUpdate("TRUNCATE TABLE Partie, Arbitre, Tournoi, Joueur");
-		}
+		throw new NotImplementedError();
 	}
 
 	/**
@@ -47,7 +30,7 @@ public class Main {
 	 * @throws SQLException
 	 */
 	public static Connection connect() throws SQLException {
-		return DS.getConnection();
+		throw new NotImplementedError();
 	}
 
 }
