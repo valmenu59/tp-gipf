@@ -126,5 +126,9 @@ public class Joueur {
 			return false;
 		}
 	}
+	
+	public int hashCode() {
+		return login.hashCode();
+	}
 
 }

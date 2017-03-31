@@ -5,7 +5,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -87,48 +89,58 @@ public class Partie {
 		}
 	}
 
-	public void setTournoi(int t) {
-		idTournoi = Optional.of(t);
+	public void setTournoi(Tournoi t) {
+		idTournoi = Optional.of(t.getIdTournoi());
 	}
 
 	public static Optional<Partie> load(int idPartie, Connection con) throws SQLException {
 		try (Statement stmt = con.createStatement()) {
 			ResultSet rs = stmt.executeQuery("SELECT * FROM Partie WHERE idPartie = " + idPartie);
-			if (!rs.next()) {
-				return Optional.empty();
-			} else {
-				Instant date = rs.getTimestamp("datePartie").toInstant();
-				String loginBlanc = rs.getString("blanc");
-				String loginNoir = rs.getString("noir");
-				Optional<Integer> piecesRestantes = Optional.ofNullable(rs.getObject("piecesRestantes"))
-						.map(o -> (Integer) o);
-				Optional<String> loginGagnant = Optional.ofNullable(rs.getString("gagnant"));
-				Optional<String> loginPerdant = Optional.ofNullable(rs.getString("perdant"));
-				Optional<Integer> idTournoi = Optional.ofNullable(rs.getObject("idTournoi")).map(o -> (Integer) o);
-
-				Joueur blanc = Joueur.load(loginBlanc, con).get();
-				Joueur noir = Joueur.load(loginNoir, con).get();
-
-				Optional<Joueur> gagnant = loginGagnant.map(j -> j.equals(loginBlanc) ? blanc : noir);
-				Optional<Joueur> perdant = loginPerdant.map(j -> j.equals(loginBlanc) ? blanc : noir);
-
-				return Optional
-						.of(new Partie(idPartie, date, blanc, noir, gagnant, perdant, piecesRestantes, idTournoi));
-			}
+			return load(rs, con).stream().findAny();
 		}
+	}
 
+	private static List<Partie> load(ResultSet rs, Connection con) throws SQLException {
+		List<Partie> parties = new ArrayList<>();
+		while (rs.next()) {
+			int idPartie = rs.getInt("idPartie");
+			Instant date = rs.getTimestamp("datePartie").toInstant();
+			String loginBlanc = rs.getString("blanc");
+			String loginNoir = rs.getString("noir");
+			Optional<Integer> piecesRestantes = Optional.ofNullable(rs.getObject("piecesRestantes"))
+					.map(o -> (Integer) o);
+			Optional<String> loginGagnant = Optional.ofNullable(rs.getString("gagnant"));
+			Optional<String> loginPerdant = Optional.ofNullable(rs.getString("perdant"));
+			Optional<Integer> idTournoi = Optional.ofNullable(rs.getObject("idTournoi")).map(o -> (Integer) o);
+
+			Joueur blanc = Joueur.load(loginBlanc, con).get();
+			Joueur noir = Joueur.load(loginNoir, con).get();
+
+			Optional<Joueur> gagnant = loginGagnant.map(j -> j.equals(loginBlanc) ? blanc : noir);
+			Optional<Joueur> perdant = loginPerdant.map(j -> j.equals(loginBlanc) ? blanc : noir);
+
+			parties.add(new Partie(idPartie, date, blanc, noir, gagnant, perdant, piecesRestantes, idTournoi));
+		}
+		return parties;
+	}
+
+	public static List<Partie> loadTournoi(int idTournoi, Connection con) throws SQLException {
+		try (Statement stmt = con.createStatement()) {
+			ResultSet rs = stmt.executeQuery("SELECT * FROM Partie WHERE idTournoi = " + idTournoi);
+			return load(rs, con);
+		}
 	}
 
 	public static Map<Joueur, Integer> classementPartiesJouees(Connection con) throws SQLException {
 		try (Statement stmt = con.createStatement()) {
-			ResultSet rs = stmt.executeQuery(
-					"WITH Played AS (                " + "  SELECT idPartie, blanc AS login FROM Partie          "
-							+ "  UNION                                                "
-							+ "  SELECT idPartie, noir AS login FROM Partie)          "
-							+ "SELECT Joueur.*, count(idPartie)                       "
-							+ "FROM Joueur LEFT JOIN Played USING (login)             "
-							+ "GROUP BY login                                         "
-							+ "ORDER BY count(idPartie) DESC                          ");
+			ResultSet rs = stmt.executeQuery("WITH Played AS (                      "
+					+ "  SELECT idPartie, blanc AS login FROM Partie                 "
+					+ "  UNION                                                "
+					+ "  SELECT idPartie, noir AS login FROM Partie)          "
+					+ "SELECT Joueur.*, count(idPartie)                       "
+					+ "FROM Joueur LEFT JOIN Played USING (login)             "
+					+ "GROUP BY login                                         "
+					+ "ORDER BY count(idPartie) DESC                          ");
 
 			Map<Joueur, Integer> data = new LinkedHashMap<>();
 			while (rs.next()) {
@@ -199,6 +211,18 @@ public class Partie {
 		g.save(con);
 		p.save(con);
 		save(con);
+	}
+
+	public boolean equals(Object o) {
+		if (o instanceof Partie) {
+			return idPartie == ((Partie) o).getIdPartie();
+		} else {
+			return false;
+		}
+	}
+
+	public int hashCode() {
+		return idPartie;
 	}
 
 }
