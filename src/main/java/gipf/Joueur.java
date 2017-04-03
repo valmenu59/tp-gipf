@@ -1,6 +1,7 @@
 package gipf;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -88,9 +89,14 @@ public class Joueur {
 	 * @throws SQLException
 	 */
 	public void save(Connection con) throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			stmt.executeUpdate("UPDATE Joueur SET elo = " + elo + ", password = '" + password + "', email = '" + email
-					+ "' WHERE login = '" + login + "';");
+
+		try (PreparedStatement stmt = con
+				.prepareStatement("UPDATE Joueur SET elo = ?, password = ?, email = ? WHERE login = ?;")) {
+			stmt.setDouble(1, elo);
+			stmt.setString(2, password);
+			stmt.setString(3, email);
+			stmt.setString(4, login);
+			stmt.executeUpdate();
 		}
 	}
 
@@ -111,9 +117,12 @@ public class Joueur {
 	 */
 	public static Joueur inscrire(String login, String password, String email, Connection con)
 			throws SQLException, InscriptionException {
-		try (Statement stmt = con.createStatement()) {
-			ResultSet rs = stmt.executeQuery("INSERT INTO Joueur VALUES ('" + login + "', DEFAULT, '" + password
-					+ "', '" + email + "') RETURNING *");
+		try (PreparedStatement stmt = con
+				.prepareStatement("INSERT INTO Joueur VALUES (?, DEFAULT, ?, ?) RETURNING *")) {
+			stmt.setString(1, login);
+			stmt.setString(2, password);
+			stmt.setString(3, email);
+			ResultSet rs = stmt.executeQuery();
 			if (!rs.next()) {
 				throw new IllegalStateException("Aucune donnée insérée à l'inscription de " + login);
 			}
@@ -141,8 +150,9 @@ public class Joueur {
 	 * @throws SQLException
 	 */
 	public static Optional<Joueur> load(String login, Connection con) throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			ResultSet rs = stmt.executeQuery("SELECT * FROM Joueur WHERE login = '" + login + "'");
+		try (PreparedStatement stmt = con.prepareStatement("SELECT * FROM Joueur WHERE login = ?")) {
+			stmt.setString(1, login);
+			ResultSet rs = stmt.executeQuery();
 			if (!rs.next()) {
 				return Optional.empty();
 			} else {

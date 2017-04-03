@@ -3,9 +3,11 @@ package gipf;
 import java.sql.Array;
 import java.sql.Connection;
 import java.sql.Date;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -102,19 +104,26 @@ public class Tournoi {
 	 */
 	public static Tournoi create(LocalDate debut, String lieu, List<Joueur> arbitres, Connection con)
 			throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			ResultSet rs = stmt.executeQuery(
-					"INSERT INTO Tournoi VALUES (DEFAULT, '" + debut + "', NULL, '" + lieu + "') RETURNING *");
+		final int id;
+		try (PreparedStatement stmt = con
+				.prepareStatement("INSERT INTO Tournoi VALUES (DEFAULT, ?, NULL, ?) RETURNING *")) {
+			stmt.setDate(1, Date.valueOf(debut));
+			stmt.setString(2, lieu);
+			ResultSet rs = stmt.executeQuery();
 			if (!rs.next()) {
 				throw new IllegalStateException(
 						"Aucune donnée insérée à la création du tournoi de " + lieu + " du " + debut);
 			}
-			int id = rs.getInt("idTournoi");
+			id = rs.getInt("idTournoi");
+		}
+
+		try (PreparedStatement stmt = con.prepareStatement("INSERT INTO Arbitre VALUES (?, ?)")) {
+			stmt.setInt(2, id);
 			for (Joueur j : arbitres) {
-				stmt.executeUpdate("INSERT INTO Arbitre VALUES ('" + j.getLogin() + "', " + id + ")");
+				stmt.setString(1, j.getLogin());
+				stmt.executeUpdate();
 			}
-			Tournoi t = new Tournoi(id, debut, Optional.empty(), lieu, arbitres);
-			return t;
+			return new Tournoi(id, debut, Optional.empty(), lieu, arbitres);
 		}
 	}
 
@@ -127,10 +136,12 @@ public class Tournoi {
 	 * @throws SQLException
 	 */
 	public static Optional<Tournoi> load(int idTournoi, Connection con) throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			ResultSet rs = stmt.executeQuery(
-					"SELECT Tournoi.*, array_agg(login) filter (where login is not null) FROM Tournoi LEFT JOIN Arbitre USING (idTournoi) WHERE idTournoi = "
-							+ idTournoi + " GROUP BY idTournoi");
+		try (PreparedStatement stmt = con
+				.prepareStatement("SELECT Tournoi.*, array_agg(login) filter (where login is not null) "
+						+ "FROM Tournoi LEFT JOIN Arbitre USING (idTournoi) WHERE idTournoi = ? "
+						+ "GROUP BY idTournoi")) {
+			stmt.setInt(1, idTournoi);
+			ResultSet rs = stmt.executeQuery();
 			if (!rs.next()) {
 				return Optional.empty();
 			} else {
@@ -185,13 +196,27 @@ public class Tournoi {
 	 * @throws SQLException
 	 */
 	public void save(Connection con) throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			final String f = fin.map(d -> "'" + d.toString() + "'").orElse("NULL");
+		try (PreparedStatement stmt = con.prepareStatement("UPDATE Tournoi SET dateFin = ? WHERE idTournoi = ?")) {
+			if (fin.isPresent()) {
+				stmt.setDate(1, Date.valueOf(fin.get()));
+			} else {
+				stmt.setNull(1, Types.DATE);
+			}
+			stmt.setInt(2, idTournoi);
+			stmt.executeUpdate();
+		}
 
-			stmt.executeUpdate("UPDATE Tournoi SET dateFin = " + f + " WHERE idTournoi = " + idTournoi);
-			stmt.executeUpdate("DELETE FROM Arbitre WHERE idTournoi = " + idTournoi);
+		try (PreparedStatement stmt = con.prepareStatement("DELETE FROM Arbitre WHERE idTournoi = ?")) {
+			stmt.setInt(1, idTournoi);
+			stmt.executeUpdate();
+		}
+
+		try (PreparedStatement stmt = con.prepareStatement("INSERT INTO Arbitre VALUES (?, ?)")) {
+			stmt.setInt(2, idTournoi);
 			for (Joueur j : arbitres) {
-				stmt.executeUpdate("INSERT INTO Arbitre VALUES ('" + j.getLogin() + "', " + idTournoi + ")");
+				stmt.setString(1, j.getLogin());
+
+				stmt.executeUpdate();
 			}
 		}
 	}

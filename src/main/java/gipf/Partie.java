@@ -1,9 +1,12 @@
 package gipf;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Timestamp;
+import java.sql.Types;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -129,16 +132,19 @@ public class Partie {
 	 * @throws SQLException
 	 */
 	public static Partie create(Joueur blanc, Joueur noir, Connection con) throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			ResultSet rs = stmt.executeQuery("INSERT INTO Partie VALUES (DEFAULT, DEFAULT, NULL, '" + blanc.getLogin()
-					+ "', '" + noir.getLogin() + "', NULL, NULL, NULL) RETURNING *");
-			if (!rs.next()) {
-				throw new IllegalStateException("Aucune donnée insérée à l'enregistrement de la partie");
+		try (PreparedStatement stmt = con.prepareStatement(
+				"INSERT INTO Partie VALUES (DEFAULT, DEFAULT, NULL, ?, ?, NULL, NULL, NULL) RETURNING *")) {
+			stmt.setString(1, blanc.getLogin());
+			stmt.setString(2, noir.getLogin());
+			try (ResultSet rs = stmt.executeQuery()) {
+				if (!rs.next()) {
+					throw new IllegalStateException("Aucune donnée insérée à l'enregistrement de la partie");
+				}
+				int id = rs.getInt("idPartie");
+				LocalDateTime date = rs.getTimestamp("datePartie").toLocalDateTime();
+				return new Partie(id, date, blanc, noir, Optional.empty(), Optional.empty(), Optional.empty(),
+						Optional.empty());
 			}
-			int id = rs.getInt("idPartie");
-			LocalDateTime date = rs.getTimestamp("datePartie").toLocalDateTime();
-			return new Partie(id, date, blanc, noir, Optional.empty(), Optional.empty(), Optional.empty(),
-					Optional.empty());
 		}
 	}
 
@@ -160,9 +166,11 @@ public class Partie {
 	 * @throws SQLException
 	 */
 	public static Optional<Partie> load(int idPartie, Connection con) throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			ResultSet rs = stmt.executeQuery("SELECT * FROM Partie WHERE idPartie = " + idPartie);
-			return load(rs, con).stream().findAny();
+		try (PreparedStatement stmt = con.prepareStatement("SELECT * FROM Partie WHERE idPartie = ?")) {
+			stmt.setInt(1, idPartie);
+			try (ResultSet rs = stmt.executeQuery()) {
+				return load(rs, con).stream().findAny();
+			}
 		}
 	}
 
@@ -199,9 +207,11 @@ public class Partie {
 	 * @throws SQLException
 	 */
 	public static List<Partie> loadTournoi(int idTournoi, Connection con) throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			ResultSet rs = stmt.executeQuery("SELECT * FROM Partie WHERE idTournoi = " + idTournoi);
-			return load(rs, con);
+		try (PreparedStatement stmt = con.prepareStatement("SELECT * FROM Partie WHERE idTournoi = ?")) {
+			stmt.setInt(1, idTournoi);
+			try (ResultSet rs = stmt.executeQuery()) {
+				return load(rs, con);
+			}
 		}
 	}
 
@@ -214,15 +224,15 @@ public class Partie {
 	 * @throws SQLException
 	 */
 	public static LinkedHashMap<Joueur, Integer> classementPartiesJouees(Connection con) throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			ResultSet rs = stmt.executeQuery("WITH Played AS (                      "
-					+ "  SELECT idPartie, blanc AS login FROM Partie                 "
-					+ "  UNION                                                "
-					+ "  SELECT idPartie, noir AS login FROM Partie)          "
-					+ "SELECT Joueur.*, count(idPartie)                       "
-					+ "FROM Joueur LEFT JOIN Played USING (login)             "
-					+ "GROUP BY login                                         "
-					+ "ORDER BY count(idPartie) DESC                          ");
+		try (Statement stmt = con.createStatement();
+				ResultSet rs = stmt.executeQuery("WITH Played AS (                    "
+						+ "  SELECT idPartie, blanc AS login FROM Partie              "
+						+ "  UNION                                                    "
+						+ "  SELECT idPartie, noir AS login FROM Partie)              "
+						+ "SELECT Joueur.*, count(idPartie)                           "
+						+ "FROM Joueur LEFT JOIN Played USING (login)                 "
+						+ "GROUP BY login                                             "
+						+ "ORDER BY count(idPartie) DESC                              ")) {
 
 			LinkedHashMap<Joueur, Integer> data = new LinkedHashMap<>();
 			while (rs.next()) {
@@ -246,10 +256,10 @@ public class Partie {
 	 * @throws SQLException
 	 */
 	public static LinkedHashMap<Joueur, Integer> classementPartiesGagnees(Connection con) throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			ResultSet rs = stmt
-					.executeQuery("SELECT Joueur.*, count(idPartie) FROM Joueur LEFT JOIN Partie ON login = gagnant "
-							+ "GROUP BY login ORDER BY count(idPartie) DESC");
+		try (Statement stmt = con.createStatement();
+				ResultSet rs = stmt.executeQuery(
+						"SELECT Joueur.*, count(idPartie) FROM Joueur LEFT JOIN Partie ON login = gagnant "
+								+ "GROUP BY login ORDER BY count(idPartie) DESC")) {
 			LinkedHashMap<Joueur, Integer> data = new LinkedHashMap<>();
 			while (rs.next()) {
 				int elo = rs.getInt("elo");
@@ -272,11 +282,16 @@ public class Partie {
 	 * @throws SQLException
 	 */
 	public void save(Connection con) throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			final String tourn = idTournoi.map(id -> Integer.toString(id)).orElse("NULL");
-
-			stmt.executeUpdate("UPDATE Partie SET datePartie = '" + date + "', idTournoi = " + tourn
-					+ " WHERE idPartie = " + idPartie);
+		try (PreparedStatement stmt = con
+				.prepareStatement("UPDATE Partie SET datePartie = ?, idTournoi = ? WHERE idPartie = ?")) {
+			stmt.setTimestamp(1, Timestamp.valueOf(date));
+			if (idTournoi.isPresent()) {
+				stmt.setInt(2, idTournoi.get());
+			} else {
+				stmt.setNull(2, Types.INTEGER);
+			}
+			stmt.setInt(3, idPartie);
+			stmt.executeUpdate();
 		}
 	}
 
@@ -308,9 +323,13 @@ public class Partie {
 		perdant = Optional.of(p);
 		this.piecesRestantes = Optional.of(piecesRestantes);
 
-		try (Statement stmt = con.createStatement()) {
-			stmt.executeUpdate("UPDATE Partie SET gagnant = '" + g.getLogin() + "', perdant = '" + p.getLogin()
-					+ "', piecesRestantes = '" + piecesRestantes + "' WHERE idPartie = " + idPartie);
+		try (PreparedStatement stmt = con.prepareStatement(
+				"UPDATE Partie SET gagnant = ?, perdant = ?, piecesRestantes = ? WHERE idPartie = ?")) {
+			stmt.setString(1, g.getLogin());
+			stmt.setString(2, p.getLogin());
+			stmt.setInt(3, piecesRestantes);
+			stmt.setInt(4, idPartie);
+			stmt.executeUpdate();
 		}
 
 		final double score = 32 * (1 - 1 / (1 + Math.pow(10, (p.getElo() - g.getElo()) / 400)));
