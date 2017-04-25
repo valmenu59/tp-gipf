@@ -91,7 +91,7 @@ public class Joueur {
 	public void save(Connection con) throws SQLException {
 
 		try (PreparedStatement stmt = con
-				.prepareStatement("UPDATE Joueur SET elo = ?, password = ?, email = ? WHERE login = ?;")) {
+				.prepareStatement("UPDATE Joueur SET elo = ?, password = ?, email = ? WHERE login = ?")) {
 			stmt.setDouble(1, elo);
 			stmt.setString(2, password);
 			stmt.setString(3, email);
@@ -122,13 +122,13 @@ public class Joueur {
 			stmt.setString(1, login);
 			stmt.setString(2, password);
 			stmt.setString(3, email);
-			ResultSet rs = stmt.executeQuery();
-			if (!rs.next()) {
-				throw new IllegalStateException("Aucune donnée insérée à l'inscription de " + login);
+			try (ResultSet rs = stmt.executeQuery()) {
+				if (!rs.next()) {
+					throw new IllegalStateException("Aucune donnée insérée à l'inscription de " + login);
+				}
+				int elo = rs.getInt("elo");
+				return new Joueur(login, email, password, elo);
 			}
-			int elo = rs.getInt("elo");
-			return new Joueur(login, email, password, elo);
-
 		} catch (SQLException e) {
 			switch (e.getSQLState()) {
 			case "23505":
@@ -152,14 +152,15 @@ public class Joueur {
 	public static Optional<Joueur> load(String login, Connection con) throws SQLException {
 		try (PreparedStatement stmt = con.prepareStatement("SELECT * FROM Joueur WHERE login = ?")) {
 			stmt.setString(1, login);
-			ResultSet rs = stmt.executeQuery();
-			if (!rs.next()) {
-				return Optional.empty();
-			} else {
-				double elo = rs.getDouble("elo");
-				String email = rs.getString("email");
-				String pwd = rs.getString("password");
-				return Optional.of(new Joueur(login, email, pwd, elo));
+			try (ResultSet rs = stmt.executeQuery()) {
+				if (!rs.next()) {
+					return Optional.empty();
+				} else {
+					double elo = rs.getDouble("elo");
+					String email = rs.getString("email");
+					String pwd = rs.getString("password");
+					return Optional.of(new Joueur(login, email, pwd, elo));
+				}
 			}
 		}
 	}
@@ -170,8 +171,8 @@ public class Joueur {
 	 * @throws SQLException
 	 */
 	public static List<Joueur> loadByElo(Connection con) throws SQLException {
-		try (Statement stmt = con.createStatement()) {
-			ResultSet rs = stmt.executeQuery("SELECT * FROM Joueur ORDER BY elo DESC");
+		try (Statement stmt = con.createStatement();
+				ResultSet rs = stmt.executeQuery("SELECT * FROM Joueur ORDER BY elo DESC")) {
 			ArrayList<Joueur> data = new ArrayList<>();
 			while (rs.next()) {
 				double elo = rs.getDouble("elo");
