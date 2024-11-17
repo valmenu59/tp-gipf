@@ -59,8 +59,8 @@ public class JoueurTest {
 	}
 
 	@Test
-	public void testEquals() throws SQLException {
-		Joueur j1 = Joueur.load("baroqueen", con).get();
+	public void testEquals() {
+		Joueur j1 = new Joueur("baroqueen", "", "", 0);
 		assertEquals(j1, joueurs.get(0));
 	}
 
@@ -131,6 +131,7 @@ public class JoueurTest {
 			j.save(con);
 		} catch (Exception e) {
 			// Il peut y avoir exception ici si l'attaque est détectée
+			e.printStackTrace();
 		}
 
 		// Quoi qu'il en soit l'email de cobrag ne doit pas avoir été modifié

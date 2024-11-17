@@ -1,7 +1,11 @@
 package gipf;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,6 +15,11 @@ import java.util.Optional;
  * pour que deux joueurs soient considérés comme égaux s'ils ont le même login.
  */
 public class Joueur {
+	private final String login;
+	private String email;
+	private String password;
+	private double elo;
+
 	/**
 	 * Construit un joueur avec tous ses attributs
 	 * 
@@ -21,14 +30,17 @@ public class Joueur {
 	 */
 	public Joueur(String login, String email, String password, double elo) {
 		super();
-		throw new NotImplementedError();
+		this.login = login;
+		this.email = email;
+		this.password = password;
+		this.elo = elo;
 	}
 
 	/**
 	 * @return le score ELO du joueur
 	 */
 	public double getElo() {
-		throw new NotImplementedError();
+		return elo;
 	}
 
 	/**
@@ -37,14 +49,14 @@ public class Joueur {
 	 * @param elo
 	 */
 	public void addElo(double elo) {
-		throw new NotImplementedError();
+		this.elo += elo;
 	}
 
 	/**
 	 * @return le login du joueur
 	 */
 	public String getLogin() {
-		throw new NotImplementedError();
+		return login;
 	}
 
 	/**
@@ -53,7 +65,7 @@ public class Joueur {
 	 * @param s
 	 */
 	public void setPassword(String s) {
-		throw new NotImplementedError();
+		password = s;
 	}
 
 	/**
@@ -62,12 +74,12 @@ public class Joueur {
 	 * @param s
 	 */
 	public void setEmail(String s) {
-		throw new NotImplementedError();
+		email = s;
 	}
 
 	@Override
 	public String toString() {
-		return String.format("Joueur [login=%s, elo=%.0f]", getLogin(), getElo());
+		return String.format("Joueur [login=%s, elo=%.0f]", login, elo);
 	}
 
 	/**
@@ -77,7 +89,15 @@ public class Joueur {
 	 * @throws SQLException
 	 */
 	public void save(Connection con) throws SQLException {
-		throw new NotImplementedError();
+
+		try (PreparedStatement stmt = con
+				.prepareStatement("UPDATE Joueur SET elo = ?, password = ?, email = ? WHERE login = ?")) {
+			stmt.setDouble(1, elo);
+			stmt.setString(2, password);
+			stmt.setString(3, email);
+			stmt.setString(4, login);
+			stmt.executeUpdate();
+		}
 	}
 
 	/**
@@ -97,7 +117,28 @@ public class Joueur {
 	 */
 	public static Joueur inscrire(String login, String password, String email, Connection con)
 			throws SQLException, InscriptionException {
-		throw new NotImplementedError();
+		try (PreparedStatement stmt = con
+				.prepareStatement("INSERT INTO Joueur VALUES (?, DEFAULT, ?, ?) RETURNING *")) {
+			stmt.setString(1, login);
+			stmt.setString(2, password);
+			stmt.setString(3, email);
+			try (ResultSet rs = stmt.executeQuery()) {
+				if (!rs.next()) {
+					throw new IllegalStateException("Aucune donnée insérée à l'inscription de " + login);
+				}
+				int elo = rs.getInt("elo");
+				return new Joueur(login, email, password, elo);
+			}
+		} catch (SQLException e) {
+			switch (e.getSQLState()) {
+			case "23505":
+				throw new InscriptionException("Le login " + login + " ou l'email " + email + " existe déjà");
+			case "23514":
+				throw new InscriptionException("Erreur de contrôle des données : " + e.getLocalizedMessage());
+			default:
+				throw e;
+			}
+		}
 	}
 
 	/**
@@ -109,7 +150,19 @@ public class Joueur {
 	 * @throws SQLException
 	 */
 	public static Optional<Joueur> load(String login, Connection con) throws SQLException {
-		throw new NotImplementedError();
+		try (PreparedStatement stmt = con.prepareStatement("SELECT * FROM Joueur WHERE login = ?")) {
+			stmt.setString(1, login);
+			try (ResultSet rs = stmt.executeQuery()) {
+				if (!rs.next()) {
+					return Optional.empty();
+				} else {
+					double elo = rs.getDouble("elo");
+					String email = rs.getString("email");
+					String pwd = rs.getString("password");
+					return Optional.of(new Joueur(login, email, pwd, elo));
+				}
+			}
+		}
 	}
 
 	/**
@@ -118,14 +171,25 @@ public class Joueur {
 	 * @throws SQLException
 	 */
 	public static List<Joueur> loadByElo(Connection con) throws SQLException {
-		throw new NotImplementedError();
+		try (Statement stmt = con.createStatement();
+				ResultSet rs = stmt.executeQuery("SELECT * FROM Joueur ORDER BY elo DESC")) {
+			ArrayList<Joueur> data = new ArrayList<>();
+			while (rs.next()) {
+				double elo = rs.getDouble("elo");
+				String email = rs.getString("email");
+				String pwd = rs.getString("password");
+				String login = rs.getString("login");
+				data.add(new Joueur(login, email, pwd, elo));
+			}
+			return data;
+		}
 	}
 
 	/**
 	 * @return l'email du joueur
 	 */
 	public String getEmail() {
-		throw new NotImplementedError();
+		return email;
 	}
 
 	/**
@@ -136,13 +200,13 @@ public class Joueur {
 	 *         passe
 	 */
 	public boolean checkPassword(String p) {
-		throw new NotImplementedError();
+		return password.equals(p);
 	}
 
 	@Override
 	public boolean equals(Object o) {
 		if (o instanceof Joueur) {
-			return getLogin().equals(((Joueur) o).getLogin());
+			return login.equals(((Joueur) o).login);
 		} else {
 			return false;
 		}
@@ -150,7 +214,7 @@ public class Joueur {
 
 	@Override
 	public int hashCode() {
-		return getLogin().hashCode();
+		return login.hashCode();
 	}
 
 }

@@ -1,8 +1,14 @@
 package gipf;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
+import java.sql.Timestamp;
+import java.sql.Types;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
@@ -13,26 +19,47 @@ import java.util.Optional;
  */
 public class Partie {
 
+	private final int idPartie;
+	private LocalDateTime date;
+	private Integer piecesRestantes;
+	private final Joueur blanc;
+	private final Joueur noir;
+	private Joueur gagnant;
+	private Joueur perdant;
+	private Integer idTournoi;
+
+	private Partie(int idPartie, LocalDateTime date, Joueur blanc, Joueur noir, Joueur gagnant, Joueur perdant,
+			Integer piecesRestantes, Integer idTournoi) {
+		super();
+		this.idPartie = idPartie;
+		this.date = date;
+		this.piecesRestantes = piecesRestantes;
+		this.blanc = blanc;
+		this.noir = noir;
+		this.gagnant = gagnant;
+		this.perdant = perdant;
+		this.idTournoi = idTournoi;
+	}
 
 	/**
 	 * @return l'identifiant de la partie dans la base de données
 	 */
 	public int getIdPartie() {
-		throw new NotImplementedError();
+		return idPartie;
 	}
 
 	/**
 	 * @return date et heure de la partie
 	 */
 	public LocalDateTime getDate() {
-		throw new NotImplementedError();
+		return date;
 	}
 
 	/**
 	 * Modifie les date et heure de la partie
 	 */
 	public void setDate(LocalDateTime date) {
-		throw new NotImplementedError();
+		this.date = date;
 	}
 
 	/**
@@ -41,7 +68,7 @@ public class Partie {
 	 *         connu
 	 */
 	public Optional<Integer> getPiecesRestantes() {
-		throw new NotImplementedError();
+		return Optional.ofNullable(piecesRestantes);
 	}
 
 	/**
@@ -49,7 +76,7 @@ public class Partie {
 	 * @return le joueur blanc
 	 */
 	public Joueur getBlanc() {
-		throw new NotImplementedError();
+		return blanc;
 	}
 
 	/**
@@ -57,7 +84,7 @@ public class Partie {
 	 * @return le joueur noir
 	 */
 	public Joueur getNoir() {
-		throw new NotImplementedError();
+		return noir;
 	}
 
 	/**
@@ -66,7 +93,7 @@ public class Partie {
 	 *         le noir)
 	 */
 	public Optional<Joueur> getGagnant() {
-		throw new NotImplementedError();
+		return Optional.ofNullable(gagnant);
 	}
 
 	/**
@@ -75,7 +102,7 @@ public class Partie {
 	 *         le noir)
 	 */
 	public Optional<Joueur> getPerdant() {
-		throw new NotImplementedError();
+		return Optional.ofNullable(perdant);
 	}
 
 	/**
@@ -83,13 +110,13 @@ public class Partie {
 	 * @return l'identifiant du tournoi si la partie est liée à celui-ci
 	 */
 	public Optional<Integer> getIdTournoi() {
-		throw new NotImplementedError();
+		return Optional.ofNullable(idTournoi);
 	}
 
 	@Override
 	public String toString() {
-		return "Partie [idPartie=" + getIdPartie() + ", date=" + getDate() + ", piecesRestantes=" + getPiecesRestantes() + ", blanc="
-				+ getBlanc() + ", noir=" + getNoir() + ", gagnant=" + getGagnant() + ", perdant=" + getPerdant() + "]";
+		return "Partie [idPartie=" + idPartie + ", date=" + date + ", piecesRestantes=" + piecesRestantes + ", blanc="
+				+ blanc + ", noir=" + noir + ", gagnant=" + gagnant + ", perdant=" + perdant + "]";
 	}
 
 	/**
@@ -103,7 +130,19 @@ public class Partie {
 	 * @throws SQLException
 	 */
 	public static Partie create(Joueur blanc, Joueur noir, Connection con) throws SQLException {
-		throw new NotImplementedError();
+		try (PreparedStatement stmt = con.prepareStatement(
+				"INSERT INTO Partie VALUES (DEFAULT, DEFAULT, NULL, ?, ?, NULL, NULL, NULL) RETURNING *")) {
+			stmt.setString(1, blanc.getLogin());
+			stmt.setString(2, noir.getLogin());
+			try (ResultSet rs = stmt.executeQuery()) {
+				if (!rs.next()) {
+					throw new IllegalStateException("Aucune donnée insérée à l'enregistrement de la partie");
+				}
+				int id = rs.getInt("idPartie");
+				LocalDateTime date = rs.getTimestamp("datePartie").toLocalDateTime();
+				return new Partie(id, date, blanc, noir, null, null, null, null);
+			}
+		}
 	}
 
 	/**
@@ -112,7 +151,7 @@ public class Partie {
 	 * @param t
 	 */
 	public void setTournoi(Tournoi t) {
-		throw new NotImplementedError();
+		idTournoi = t.getIdTournoi();
 	}
 
 	/**
@@ -124,7 +163,44 @@ public class Partie {
 	 * @throws SQLException
 	 */
 	public static Optional<Partie> load(int idPartie, Connection con) throws SQLException {
-		throw new NotImplementedError();
+		try (PreparedStatement stmt = con.prepareStatement("SELECT * FROM Partie WHERE idPartie = ?")) {
+			stmt.setInt(1, idPartie);
+			try (ResultSet rs = stmt.executeQuery()) {
+				return load(rs, con).stream().findAny();
+			}
+		}
+	}
+
+	private static List<Partie> load(ResultSet rs, Connection con) throws SQLException {
+		List<Partie> parties = new ArrayList<>();
+		while (rs.next()) {
+			int idPartie = rs.getInt("idPartie");
+			LocalDateTime date = rs.getTimestamp("datePartie").toLocalDateTime();// toInstant();
+			String loginBlanc = rs.getString("blanc");
+			String loginNoir = rs.getString("noir");
+
+			// Note: le type Integer permet de gérer les valeurs "null",
+			// contairement au type primitif "int"
+			Integer piecesRestantes = (Integer) rs.getObject("piecesRestantes");
+
+			String loginGagnant = rs.getString("gagnant");
+			String loginPerdant = rs.getString("perdant");
+			Integer idTournoi = (Integer) rs.getObject("idTournoi");
+
+			Joueur blanc = Joueur.load(loginBlanc, con).get();
+			Joueur noir = Joueur.load(loginNoir, con).get();
+
+			Joueur gagnant = null;
+			Joueur perdant = null;
+			if (loginGagnant != null) {
+				assert loginPerdant != null;
+				gagnant = loginGagnant.equals(loginBlanc) ? blanc : noir;
+				perdant = loginPerdant.equals(loginBlanc) ? blanc : noir;
+			}
+
+			parties.add(new Partie(idPartie, date, blanc, noir, gagnant, perdant, piecesRestantes, idTournoi));
+		}
+		return parties;
 	}
 
 	/**
@@ -136,7 +212,12 @@ public class Partie {
 	 * @throws SQLException
 	 */
 	public static List<Partie> loadTournoi(int idTournoi, Connection con) throws SQLException {
-		throw new NotImplementedError();
+		try (PreparedStatement stmt = con.prepareStatement("SELECT * FROM Partie WHERE idTournoi = ?")) {
+			stmt.setInt(1, idTournoi);
+			try (ResultSet rs = stmt.executeQuery()) {
+				return load(rs, con);
+			}
+		}
 	}
 
 	/**
@@ -148,7 +229,27 @@ public class Partie {
 	 * @throws SQLException
 	 */
 	public static LinkedHashMap<Joueur, Integer> classementPartiesJouees(Connection con) throws SQLException {
-		throw new NotImplementedError();
+		try (Statement stmt = con.createStatement();
+				ResultSet rs = stmt.executeQuery("WITH Played AS (                    "
+						+ "  SELECT idPartie, blanc AS login FROM Partie              "
+						+ "  UNION                                                    "
+						+ "  SELECT idPartie, noir AS login FROM Partie)              "
+						+ "SELECT Joueur.*, count(idPartie)                           "
+						+ "FROM Joueur LEFT JOIN Played USING (login)                 "
+						+ "GROUP BY login                                             "
+						+ "ORDER BY count(idPartie) DESC                              ")) {
+
+			LinkedHashMap<Joueur, Integer> data = new LinkedHashMap<>();
+			while (rs.next()) {
+				int elo = rs.getInt("elo");
+				String email = rs.getString("email");
+				String pwd = rs.getString("password");
+				String login = rs.getString("login");
+				int count = rs.getInt("count");
+				data.put(new Joueur(login, email, pwd, elo), count);
+			}
+			return data;
+		}
 	}
 
 	/**
@@ -160,7 +261,21 @@ public class Partie {
 	 * @throws SQLException
 	 */
 	public static LinkedHashMap<Joueur, Integer> classementPartiesGagnees(Connection con) throws SQLException {
-		throw new NotImplementedError();
+		try (Statement stmt = con.createStatement();
+				ResultSet rs = stmt.executeQuery(
+						"SELECT Joueur.*, count(idPartie) FROM Joueur LEFT JOIN Partie ON login = gagnant "
+								+ "GROUP BY login ORDER BY count(idPartie) DESC")) {
+			LinkedHashMap<Joueur, Integer> data = new LinkedHashMap<>();
+			while (rs.next()) {
+				int elo = rs.getInt("elo");
+				String email = rs.getString("email");
+				String pwd = rs.getString("password");
+				String login = rs.getString("login");
+				int count = rs.getInt("count");
+				data.put(new Joueur(login, email, pwd, elo), count);
+			}
+			return data;
+		}
 	}
 
 	/**
@@ -172,7 +287,14 @@ public class Partie {
 	 * @throws SQLException
 	 */
 	public void save(Connection con) throws SQLException {
-		throw new NotImplementedError();
+		try (PreparedStatement stmt = con
+				.prepareStatement("UPDATE Partie SET datePartie = ?, idTournoi = ? WHERE idPartie = ?")) {
+			stmt.setTimestamp(1, Timestamp.valueOf(date));
+			// setObject permet de gérer les valeurs null
+			stmt.setObject(2, idTournoi);
+			stmt.setInt(3, idPartie);
+			stmt.executeUpdate();
+		}
 	}
 
 	/**
@@ -187,13 +309,42 @@ public class Partie {
 	 * @throws SQLException
 	 */
 	public void setGagnant(boolean blancGagne, int piecesRestantes, Connection con) throws SQLException {
-		throw new NotImplementedError();
+		if (this.piecesRestantes != null) {
+			throw new IllegalStateException("Le vainqueur de cette partie a déjà été désigné");
+		}
+		final Joueur g;
+		final Joueur p;
+		if (blancGagne) {
+			g = blanc;
+			p = noir;
+		} else {
+			g = noir;
+			p = blanc;
+		}
+		gagnant = g;
+		perdant = p;
+		this.piecesRestantes = piecesRestantes;
+
+		try (PreparedStatement stmt = con.prepareStatement(
+				"UPDATE Partie SET gagnant = ?, perdant = ?, piecesRestantes = ? WHERE idPartie = ?")) {
+			stmt.setString(1, g.getLogin());
+			stmt.setString(2, p.getLogin());
+			stmt.setInt(3, piecesRestantes);
+			stmt.setInt(4, idPartie);
+			stmt.executeUpdate();
+		}
+
+		final double score = 32 * (1 - 1 / (1 + Math.pow(10, (p.getElo() - g.getElo()) / 400)));
+		g.addElo(score);
+		p.addElo(-score);
+		g.save(con);
+		p.save(con);
 	}
 
 	@Override
 	public boolean equals(Object o) {
 		if (o instanceof Partie) {
-			return getIdPartie() == ((Partie) o).getIdPartie();
+			return idPartie == ((Partie) o).idPartie;
 		} else {
 			return false;
 		}
@@ -201,7 +352,7 @@ public class Partie {
 
 	@Override
 	public int hashCode() {
-		return getIdPartie();
+		return idPartie;
 	}
 
 }
