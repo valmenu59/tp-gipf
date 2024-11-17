@@ -118,7 +118,7 @@ public class Joueur {
 	public static Joueur inscrire(String login, String password, String email, Connection con)
 			throws SQLException, InscriptionException {
 		try (PreparedStatement stmt = con
-				.prepareStatement("INSERT INTO Joueur VALUES (?, DEFAULT, ?, ?) RETURNING *")) {
+				.prepareStatement("INSERT INTO Joueur (login, elo, password, email) VALUES (?, DEFAULT, ?, ?) RETURNING *")) {
 			stmt.setString(1, login);
 			stmt.setString(2, password);
 			stmt.setString(3, email);
