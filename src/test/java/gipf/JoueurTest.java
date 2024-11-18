@@ -114,7 +114,7 @@ public class JoueurTest {
     public void testInscrireQuote() throws SQLException, InscriptionException {
         Joueur.inscrire("to'to", "to'to123", "to%27to@univ-valenciennes.fr", con);
         Joueur j = Joueur.load("to'to", con).get();
-        assertEquals("to'to", j.getLogin());
+        assertEquals("aaaaaaaaaaaaaaa", j.getLogin());
         assertEquals("to%27to@univ-valenciennes.fr", j.getEmail());
         assertTrue(j.checkPassword("to'to123"));
     }
